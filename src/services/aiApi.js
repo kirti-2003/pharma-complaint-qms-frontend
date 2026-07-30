@@ -1,4 +1,4 @@
-import apiClient from "../services/apiClient";
+import apiClient from "../config/apiClient";
 
 export async function processComplaint(
   complaintId,

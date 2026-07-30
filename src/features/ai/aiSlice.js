@@ -1,4 +1,7 @@
-import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import {
+  createAsyncThunk,
+  createSlice,
+} from "@reduxjs/toolkit";
 
 import {
   getComplaintAIRuns,
@@ -6,41 +9,73 @@ import {
   sendChatCorrection,
 } from "../../services/aiApi";
 
-export const processComplaintThunk = createAsyncThunk(
-  "ai/processComplaint",
-  async (complaintId, thunkAPI) => {
-    try {
-      return await processComplaint(complaintId);
-    } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
-    }
-  }
-);
-
-export const sendChatCorrectionThunk = createAsyncThunk(
-  "ai/sendChatCorrection",
-  async ({ complaintId, messageText }, thunkAPI) => {
-    try {
-      return await sendChatCorrection(
+export const processComplaintThunk =
+  createAsyncThunk(
+    "ai/processComplaint",
+    async (
+      {
         complaintId,
-        messageText
-      );
-    } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
+        triggerType = "TEXT_SUBMISSION",
+      },
+      thunkAPI
+    ) => {
+      try {
+        return await processComplaint(
+          complaintId,
+          triggerType
+        );
+      } catch (error) {
+        return thunkAPI.rejectWithValue(
+          error?.response?.data?.detail ||
+            error.message ||
+            "Failed to process complaint."
+        );
+      }
     }
-  }
-);
+  );
 
-export const getComplaintAIRunsThunk = createAsyncThunk(
-  "ai/getComplaintAIRuns",
-  async (complaintId, thunkAPI) => {
-    try {
-      return await getComplaintAIRuns(complaintId);
-    } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
+export const sendChatCorrectionThunk =
+  createAsyncThunk(
+    "ai/sendChatCorrection",
+    async (
+      {
+        complaintId,
+        messageText,
+      },
+      thunkAPI
+    ) => {
+      try {
+        return await sendChatCorrection(
+          complaintId,
+          messageText
+        );
+      } catch (error) {
+        return thunkAPI.rejectWithValue(
+          error?.response?.data?.detail ||
+            error.message ||
+            "Failed to apply correction."
+        );
+      }
     }
-  }
-);
+  );
+
+export const getComplaintAIRunsThunk =
+  createAsyncThunk(
+    "ai/getComplaintAIRuns",
+    async (complaintId, thunkAPI) => {
+      try {
+        return await getComplaintAIRuns(
+          complaintId
+        );
+      } catch (error) {
+        return thunkAPI.rejectWithValue(
+          error?.response?.data?.detail ||
+            error.message ||
+            "Failed to fetch AI runs."
+        );
+      }
+    }
+  );
 
 const initialState = {
   latestRun: null,
@@ -52,67 +87,114 @@ const initialState = {
 const aiSlice = createSlice({
   name: "ai",
   initialState,
+
   reducers: {
     clearAIError(state) {
       state.error = null;
     },
+
+    resetAI(state) {
+      state.latestRun = null;
+      state.runs = [];
+      state.loading = false;
+      state.error = null;
+    },
   },
+
   extraReducers: (builder) => {
     builder
-      .addCase(processComplaintThunk.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(processComplaintThunk.fulfilled, (state, action) => {
-        state.loading = false;
-        state.latestRun = action.payload.ai_run;
-      })
-      .addCase(processComplaintThunk.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
+      // Process complaint
+      .addCase(
+        processComplaintThunk.pending,
+        (state) => {
+          state.loading = true;
+          state.error = null;
+        }
+      )
+      .addCase(
+        processComplaintThunk.fulfilled,
+        (state, action) => {
+          state.loading = false;
 
-      .addCase(sendChatCorrectionThunk.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
+          state.latestRun =
+            action.payload?.ai_run ||
+            action.payload;
+        }
+      )
+      .addCase(
+        processComplaintThunk.rejected,
+        (state, action) => {
+          state.loading = false;
+          state.error =
+            action.payload ||
+            "Failed to process complaint.";
+        }
+      )
+
+      // Chat correction
+      .addCase(
+        sendChatCorrectionThunk.pending,
+        (state) => {
+          state.loading = true;
+          state.error = null;
+        }
+      )
       .addCase(
         sendChatCorrectionThunk.fulfilled,
         (state, action) => {
           state.loading = false;
-          state.latestRun = action.payload.ai_run;
+
+          state.latestRun =
+            action.payload?.ai_run ||
+            action.payload;
         }
       )
       .addCase(
         sendChatCorrectionThunk.rejected,
         (state, action) => {
           state.loading = false;
-          state.error = action.payload;
+          state.error =
+            action.payload ||
+            "Failed to apply correction.";
         }
       )
 
-      .addCase(getComplaintAIRunsThunk.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
+      // Get AI runs
+      .addCase(
+        getComplaintAIRunsThunk.pending,
+        (state) => {
+          state.loading = true;
+          state.error = null;
+        }
+      )
       .addCase(
         getComplaintAIRunsThunk.fulfilled,
         (state, action) => {
           state.loading = false;
-          state.runs = action.payload.items || [];
-          state.latestRun = action.payload.items?.[0] || null;
+
+          const items =
+            action.payload?.items || [];
+
+          state.runs = items;
+          state.latestRun =
+            items[0] || null;
         }
       )
       .addCase(
         getComplaintAIRunsThunk.rejected,
         (state, action) => {
           state.loading = false;
-          state.error = action.payload;
+          state.error =
+            action.payload ||
+            "Failed to fetch AI runs.";
         }
       );
   },
 });
 
-export const { clearAIError } = aiSlice.actions;
+export const {
+  clearAIError,
+  resetAI,
+} = aiSlice.actions;
 
 export default aiSlice.reducer;
